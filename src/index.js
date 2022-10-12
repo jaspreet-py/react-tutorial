@@ -4,36 +4,75 @@ import './index.css';
 
 function Square(props) {
     return (
-        <button className='square' onClick={props.onClick}>
+        <button className='square' onClick={props.onClick} autoComplete="off" disabled={props.disabled} tabIndex="0">
             {props.value}
         </button>
     );
 }
 
+// TODO: To be used when implementing 'Play against computer' mode
+// function PlayMode(props) {
+//     return (
+//         <select className='game-mode form-select'>
+//             {/* <option>
+//                     Play against computer
+//                 </option> */}
+//             <option id='playFriend'>
+//                 Play against a friend
+//             </option>
+//         </select>
+//     )
+// }
+
+
+function ScoreBoard(props) {
+    const { xIsNext, score } = props;
+    return (
+        <div className='scoreboard my-4 d-flex justify-content-between'>
+            <button
+                className={`btn btn-dark col-5 d-flex justify-content-between align-items-center ${xIsNext ? ' active-player' : ''}`}
+                tabIndex='0'
+            >
+                <span>X</span>
+                <span>{score.x ? score.x : '-'}</span>
+            </button>
+            <button
+                className={`btn btn-light col-5 d-flex justify-content-between align-items-center ${xIsNext ? '' : ' active-player'}`}
+                tabIndex='0'
+            >
+                <span>O</span>
+                <span>{score.o ? score.o : '-'}</span>
+            </button>
+        </div>
+    )
+}
+
 class Board extends React.Component {
     renderSquare(i) {
+        const isDisabled = this.props.isWon || this.props.squares[i];
         return (
             <Square
                 value={this.props.squares[i]}
                 onClick={() => this.props.onClick(i)}
+                disabled={isDisabled}
             />
         );
     }
 
     render() {
         return (
-            <div>
-                <div className="board-row">
+            <div className='d-flex flex-column'>
+                <div className="d-inline-flex">
                     {this.renderSquare(0)}
                     {this.renderSquare(1)}
                     {this.renderSquare(2)}
                 </div>
-                <div className="board-row">
+                <div className="d-inline-flex">
                     {this.renderSquare(3)}
                     {this.renderSquare(4)}
                     {this.renderSquare(5)}
                 </div>
-                <div className="board-row">
+                <div className="d-inline-flex">
                     {this.renderSquare(6)}
                     {this.renderSquare(7)}
                     {this.renderSquare(8)}
@@ -47,11 +86,15 @@ class Game extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            history: [{
-                squares: Array(9).fill(null),
-            }],
+            squares: Array(9).fill(null),
+            xStarts: true,
             xIsNext: true,
             currentStep: 0,
+            isWon: false,
+            score: {
+                x: 0,
+                o: 0,
+            },
         }
     }
 
@@ -65,18 +108,23 @@ class Game extends React.Component {
         // Return early if a winner is decided or the square
         // has already been filled
         const { state } = this;
-        const { xIsNext, currentStep } = state;
-        const history = state.history.slice(0, currentStep + 1);
-        const current = history[history.length - 1];
-        const squares = current.squares.slice();
+        if (state.isWon) return;
+        const squares = state.squares.slice();
+        if (squares[i]) return;
+        squares[i] = state.xIsNext ? 'X' : 'O';
         const winner = this.calculateWinner(squares);
-        if (winner || squares[i]) return;
-        squares[i] = xIsNext ? 'X' : 'O';
-        this.setState({
-            history: [...history, { squares }],
-            xIsNext: !xIsNext,
-            currentStep: history.length,
-        });
+        this.setState({ squares });
+        if (winner) {
+            const score = winner === "X" ? { x: state.score.x + 1 } : { o: state.score.o + 1 };
+            return this.setState(state => ({
+                isWon: true,
+                score,
+            }));
+        }
+        this.setState(state => ({
+            xIsNext: !state.xIsNext,
+            currentStep: state.currentStep + 1,
+        }))
     }
 
     calculateWinner = (squares) => {
@@ -109,50 +157,69 @@ class Game extends React.Component {
         return null;
     }
 
-    jumpTo = (step) => {
+    resetBoard = (resetScore = false) => {
         /**
-         * Jump to the given step/move of the game.
-         * Updates the 'currentStep' and 'xIsNext' state of the component
+         * Resets the game board for a new game. Resets player scores
+         * if {resetScore} is passed as {true}.
+         * 
+         * @param  {Boolean}  resetScore  Whether to reset player scores or not.
+         * @returns  {Void}
          */
+        const { state } = this;
+        const { squares } = state;
+        if (squares.find(element => element !== null) === undefined) return;
         this.setState({
-            currentStep: step,
-            xIsNext: (step % 2) === 0,
+            squares: Array(9).fill(null),
+            currentStep: 0,
+            isWon: false,
         })
+        const isGameOver = state.isWon || (squares.find(element => element === null) === undefined);
+        if (isGameOver) {
+            this.setState({
+                xStarts: !state.xStarts,
+                xIsNext: !state.xStarts,
+            })
+        } else {
+            this.setState({
+                xIsNext: state.xStarts,
+            })
+        }
+        if (state.isWon)
+            if (resetScore) {
+                this.setState({
+                    score: {
+                        x: 0,
+                        o: 0,
+                    }
+                })
+            }
     }
 
     render() {
         const { state } = this;
-        const { history, currentStep } = state;
-        const current = history[currentStep];
-        const winner = this.calculateWinner(current.squares);
-
-        const moves = history.map((step, move) => {
-            const description = move ? `Go to move ${move}` : 'Go to start';
-            return (
-                <li key={move}>
-                    <button onClick={() => this.jumpTo(move)}>{description}</button>
-                </li>
-            )
-        })
+        const { currentStep, squares } = state;
+        const winner = this.calculateWinner(squares);
 
         let status;
-        if (winner) {
-            status = `Winner: ${winner}`;
+        if ((currentStep === 9 && !winner) || winner) {
+            status = 'Game Over';
         } else {
-            status = `Next player: ${state.xIsNext ? "X" : "O"}`;
+            status = `${state.xIsNext ? 'X' : 'O'}'s Turn`;
         }
         return (
-            <div className="game">
-                <div className="game-board">
+            <div className="game d-flex flex-column">
+                {/* <h1 className='display-1'>Tic Tac Toe</h1> */}
+                {/* <PlayMode /> */}
+                <ScoreBoard xIsNext={state.xIsNext} score={state.score} />
+                <span>{status}</span>
+                <div className="m-5">
                     <Board
-                        squares={current.squares}
+                        squares={squares}
                         onClick={(i) => this.handleClick(i)}
+                        isWon={winner !== null}
                     />
                 </div>
-                <div className="game-info">
-                    <div>{status}</div>
-                    <ol>{moves}</ol>
-                </div>
+                <button className='btn btn-outline-dark' onClick={() => this.resetBoard()}>Restart</button>
             </div>
         );
     }
