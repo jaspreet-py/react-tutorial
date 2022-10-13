@@ -115,10 +115,12 @@ class Game extends React.Component {
         const winner = this.calculateWinner(squares);
         this.setState({ squares });
         if (winner) {
-            const score = winner === "X" ? { x: state.score.x + 1 } : { o: state.score.o + 1 };
             return this.setState(state => ({
                 isWon: true,
-                score,
+                score: {
+                    x: winner === "X" ? state.score.x + 1 : state.score.x,
+                    o: winner === "O" ? state.score.o + 1 : state.score.o,
+                },
             }));
         }
         this.setState(state => ({
@@ -184,15 +186,14 @@ class Game extends React.Component {
                 xIsNext: state.xStarts,
             })
         }
-        if (state.isWon)
-            if (resetScore) {
-                this.setState({
-                    score: {
-                        x: 0,
-                        o: 0,
-                    }
-                })
-            }
+        if (resetScore) {
+            this.setState({
+                score: {
+                    x: 0,
+                    o: 0,
+                }
+            })
+        }
     }
 
     render() {
